@@ -24,26 +24,53 @@ import torch.nn as nn
 from torch.nn import CrossEntropyLoss, MSELoss
 
 from transformers.activations import ACT2FN
-from transformers.file_utils import (
-    ModelOutput,
-    add_code_sample_docstrings,
-    add_start_docstrings,
-    add_start_docstrings_to_model_forward,
-    replace_return_docstrings,
-)
+# transformers v5 relocated/removed several symbols — import from new locations
+# and stub out removed pruning/multi-GPU helpers (not used in the forward pass)
 from transformers.modeling_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
 )
-from transformers.modeling_utils import (
-    Conv1D,
-    PreTrainedModel,
-    SequenceSummary,
-    find_pruneable_heads_and_indices,
-    prune_conv1d_layer,
+from transformers.modeling_utils import PreTrainedModel
+from transformers.pytorch_utils import Conv1D
+from transformers.utils import (
+    ModelOutput,
+    logging,
 )
-from transformers.utils import logging
-from transformers.utils.model_parallel_utils import assert_device_map, get_device_map
+
+# No-op stubs for HuggingFace docstring decorators whose API changed in
+# transformers v5.  They only add documentation; they don't affect behaviour.
+def add_start_docstrings(*args, **kwargs):
+    def decorator(fn): return fn
+    return decorator
+
+def add_start_docstrings_to_model_forward(*args, **kwargs):
+    def decorator(fn): return fn
+    return decorator
+
+def add_code_sample_docstrings(*args, **kwargs):
+    def decorator(fn): return fn
+    return decorator
+
+def replace_return_docstrings(*args, **kwargs):
+    def decorator(fn): return fn
+    return decorator
 from transformers.models.gpt2.configuration_gpt2 import GPT2Config
+
+# Stubs for symbols removed in transformers v5 (only used in optional pruning
+# and multi-GPU code paths that we do not exercise).
+def find_pruneable_heads_and_indices(heads, n_heads, head_size, already_pruned):
+    raise NotImplementedError("Head pruning not supported with transformers >= v5")
+
+def prune_conv1d_layer(layer, index, dim=1):
+    raise NotImplementedError("Head pruning not supported with transformers >= v5")
+
+def assert_device_map(device_map, num_blocks):
+    pass  # no-op stub
+
+def get_device_map(n_layers, devices):
+    return {0: list(range(n_layers))}
+
+class SequenceSummary:  # unused but kept to avoid NameError in dead code
+    pass
 
 logger = logging.get_logger(__name__)
 
@@ -349,9 +376,15 @@ class GPT2PreTrainedModel(PreTrainedModel):
     config_class = GPT2Config
     load_tf_weights = load_tf_weights_in_gpt2
     base_model_prefix = "transformer"
+    # transformers v5: tie_weights() now requires this attribute
+    _tied_weights_keys = []
 
     def __init__(self, *inputs, **kwargs):
         super().__init__(*inputs, **kwargs)
+
+    def init_weights(self):
+        """Override to bypass transformers v5 tie_weights() which requires a LMHead."""
+        self.apply(self._init_weights)
 
     def _init_weights(self, module):
         """Initialize the weights."""
@@ -365,6 +398,36 @@ class GPT2PreTrainedModel(PreTrainedModel):
             module.bias.data.zero_()
             module.weight.data.fill_(1.0)
             # module.weight.data.fill_(.01)  # KL: Adapter change
+
+    def get_head_mask(self, head_mask, num_hidden_layers, is_attention_chunked=False):
+        """
+        Prepare the head mask (None means all heads active).
+        Reimplemented here because transformers v5 removed it from PreTrainedModel.
+        """
+        if head_mask is not None:
+            head_mask = self._convert_head_mask_to_5d(head_mask, num_hidden_layers)
+            if is_attention_chunked is True:
+                head_mask = head_mask.unsqueeze(-1)
+        else:
+            head_mask = [None] * num_hidden_layers
+        return head_mask
+
+    def invert_attention_mask(self, encoder_attention_mask):
+        """
+        Invert an attention mask (1 → attend, 0 → ignore) to the additive format
+        used internally (-10000 for masked positions).
+        Reimplemented here because transformers v5 changed the base class.
+        """
+        if encoder_attention_mask.dim() == 3:
+            encoder_extended = encoder_attention_mask[:, None, :, :]
+        elif encoder_attention_mask.dim() == 2:
+            encoder_extended = encoder_attention_mask[:, None, None, :]
+        else:
+            raise ValueError(f"Unexpected attention mask shape: {encoder_attention_mask.shape}")
+        encoder_extended = encoder_extended.to(dtype=self.dtype)
+        encoder_extended = (1.0 - encoder_extended) * -10000.0
+        return encoder_extended
+
 
 
 @dataclass
@@ -520,7 +583,7 @@ class GPT2Model(GPT2PreTrainedModel):
         self.wte = nn.Embedding(config.vocab_size, config.n_embd)
         # self.wpe = nn.Embedding(config.n_positions, config.n_embd)
         self.drop = nn.Dropout(config.embd_pdrop)
-        self.h = nn.ModuleList([Block(config.n_ctx, config, scale=True) for _ in range(config.n_layer)])
+        self.h = nn.ModuleList([Block(config.n_positions, config, scale=True) for _ in range(config.n_layer)])
         self.ln_f = nn.LayerNorm(config.n_embd, eps=config.layer_norm_epsilon)
 
         self.init_weights()

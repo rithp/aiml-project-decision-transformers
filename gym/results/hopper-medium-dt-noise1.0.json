@@ -1,0 +1,20 @@
+[
+  {
+    "noise_std": 1.0,
+    "model_type": "dt",
+    "env": "hopper",
+    "dataset": "medium",
+    "target_return": 3600,
+    "return_mean": 1540.3573626840155,
+    "return_std": 299.61630540512806
+  },
+  {
+    "noise_std": 1.0,
+    "model_type": "dt",
+    "env": "hopper",
+    "dataset": "medium",
+    "target_return": 1800,
+    "return_mean": 1333.7943783621827,
+    "return_std": 111.68393341963639
+  }
+]

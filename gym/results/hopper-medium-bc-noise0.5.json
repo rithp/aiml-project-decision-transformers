@@ -1,0 +1,11 @@
+[
+  {
+    "noise_std": 0.5,
+    "model_type": "bc",
+    "env": "hopper",
+    "dataset": "medium",
+    "target_return": 3600,
+    "return_mean": 378.80241049105774,
+    "return_std": 58.67624340451688
+  }
+]

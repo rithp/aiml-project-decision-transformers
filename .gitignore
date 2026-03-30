@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Data (large binary files)
+gym/data/*.pkl
+gym/data/*.h5
+gym/data/*.hdf5
+
+# Checkpoints (can be very large)
+gym/checkpoints/
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# Wandb
+wandb/

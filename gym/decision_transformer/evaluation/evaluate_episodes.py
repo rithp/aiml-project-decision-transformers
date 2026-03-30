@@ -18,10 +18,10 @@ def evaluate_episode(
     model.eval()
     model.to(device=device)
 
-    state_mean = torch.from_numpy(state_mean).to(device=device)
-    state_std = torch.from_numpy(state_std).to(device=device)
+    state_mean = torch.from_numpy(state_mean).to(dtype=torch.float32, device=device)
+    state_std = torch.from_numpy(state_std).to(dtype=torch.float32, device=device)
 
-    state = env.reset()
+    state, _ = env.reset()
 
     # we keep all the histories on the device
     # note that the latest action and reward will be "padding"
@@ -47,9 +47,10 @@ def evaluate_episode(
         actions[-1] = action
         action = action.detach().cpu().numpy()
 
-        state, reward, done, _ = env.step(action)
+        state, reward, terminated, truncated, _ = env.step(action)
+        done = terminated or truncated
 
-        cur_state = torch.from_numpy(state).to(device=device).reshape(1, state_dim)
+        cur_state = torch.from_numpy(state).to(device=device, dtype=torch.float32).reshape(1, state_dim)
         states = torch.cat([states, cur_state], dim=0)
         rewards[-1] = reward
 
@@ -79,10 +80,10 @@ def evaluate_episode_rtg(
     model.eval()
     model.to(device=device)
 
-    state_mean = torch.from_numpy(state_mean).to(device=device)
-    state_std = torch.from_numpy(state_std).to(device=device)
+    state_mean = torch.from_numpy(state_mean).to(dtype=torch.float32, device=device)
+    state_std = torch.from_numpy(state_std).to(dtype=torch.float32, device=device)
 
-    state = env.reset()
+    state, _ = env.reset()
     if mode == 'noise':
         state = state + np.random.normal(0, 0.1, size=state.shape)
 
@@ -115,9 +116,10 @@ def evaluate_episode_rtg(
         actions[-1] = action
         action = action.detach().cpu().numpy()
 
-        state, reward, done, _ = env.step(action)
+        state, reward, terminated, truncated, _ = env.step(action)
+        done = terminated or truncated
 
-        cur_state = torch.from_numpy(state).to(device=device).reshape(1, state_dim)
+        cur_state = torch.from_numpy(state).to(device=device, dtype=torch.float32).reshape(1, state_dim)
         states = torch.cat([states, cur_state], dim=0)
         rewards[-1] = reward
 

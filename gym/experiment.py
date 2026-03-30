@@ -1,9 +1,12 @@
-import gym
+import gymnasium as gym
 import numpy as np
 import torch
 import wandb
 
 import argparse
+import copy
+import json
+import os
 import pickle
 import random
 import sys
@@ -23,30 +26,61 @@ def discount_cumsum(x, gamma):
     return discount_cumsum
 
 
+def add_reward_noise(trajectories, noise_std):
+    """
+    Deep-copy trajectories and add Gaussian noise N(0, noise_std^2) to every
+    reward in the dataset.  noise_std=0.0 is a no-op (clean run).
+    """
+    if noise_std == 0.0:
+        return trajectories  # nothing to do
+    noisy = copy.deepcopy(trajectories)
+    for traj in noisy:
+        noise = np.random.normal(0.0, noise_std, traj['rewards'].shape)
+        traj['rewards'] = traj['rewards'] + noise
+    print(f'[noise] Added Gaussian reward noise with std={noise_std:.3f}')
+    return noisy
+
+
+def save_checkpoint(model, optimizer, scheduler, iter_num, save_dir, variant):
+    """Save a training checkpoint to save_dir."""
+    os.makedirs(save_dir, exist_ok=True)
+    path = os.path.join(save_dir, f'checkpoint_iter{iter_num}.pt')
+    torch.save({
+        'iter': iter_num,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'scheduler_state_dict': scheduler.state_dict() if scheduler is not None else None,
+        'variant': variant,
+    }, path)
+    print(f'[checkpoint] Saved → {path}')
+
+
 def experiment(
         exp_prefix,
         variant,
 ):
     device = variant.get('device', 'cuda')
     log_to_wandb = variant.get('log_to_wandb', False)
+    reward_noise_std = variant.get('reward_noise_std', 0.0)
+    checkpoint_dir = variant.get('checkpoint_dir', 'checkpoints')
 
     env_name, dataset = variant['env'], variant['dataset']
     model_type = variant['model_type']
     group_name = f'{exp_prefix}-{env_name}-{dataset}'
-    exp_prefix = f'{group_name}-{random.randint(int(1e5), int(1e6) - 1)}'
+    exp_prefix = f'{group_name}-noise{reward_noise_std}-{random.randint(int(1e5), int(1e6) - 1)}'
 
     if env_name == 'hopper':
-        env = gym.make('Hopper-v3')
+        env = gym.make('Hopper-v5')
         max_ep_len = 1000
         env_targets = [3600, 1800]  # evaluation conditioning targets
         scale = 1000.  # normalization for rewards/returns
     elif env_name == 'halfcheetah':
-        env = gym.make('HalfCheetah-v3')
+        env = gym.make('HalfCheetah-v5')
         max_ep_len = 1000
         env_targets = [12000, 6000]
         scale = 1000.
     elif env_name == 'walker2d':
-        env = gym.make('Walker2d-v3')
+        env = gym.make('Walker2d-v5')
         max_ep_len = 1000
         env_targets = [5000, 2500]
         scale = 1000.
@@ -69,6 +103,9 @@ def experiment(
     dataset_path = f'data/{env_name}-{dataset}-v2.pkl'
     with open(dataset_path, 'rb') as f:
         trajectories = pickle.load(f)
+
+    # inject reward noise (deep-copied; original file untouched)
+    trajectories = add_reward_noise(trajectories, reward_noise_std)
 
     # save all path information into separate lists
     mode = variant.get('mode', 'normal')
@@ -159,7 +196,7 @@ def experiment(
         d = torch.from_numpy(np.concatenate(d, axis=0)).to(dtype=torch.long, device=device)
         rtg = torch.from_numpy(np.concatenate(rtg, axis=0)).to(dtype=torch.float32, device=device)
         timesteps = torch.from_numpy(np.concatenate(timesteps, axis=0)).to(dtype=torch.long, device=device)
-        mask = torch.from_numpy(np.concatenate(mask, axis=0)).to(device=device)
+        mask = torch.from_numpy(np.concatenate(mask, axis=0)).to(dtype=torch.float32, device=device)
 
         return s, a, r, d, rtg, timesteps, mask
 
@@ -204,6 +241,13 @@ def experiment(
                 f'target_{target_rew}_length_std': np.std(lengths),
             }
         return fn
+
+    # directory for checkpoints specific to this run
+    run_checkpoint_dir = os.path.join(
+        checkpoint_dir,
+        f'{env_name}-{dataset}-{model_type}-noise{reward_noise_std}',
+        exp_prefix,
+    )
 
     if model_type == 'dt':
         model = DecisionTransformer(
@@ -274,10 +318,43 @@ def experiment(
         )
         # wandb.watch(model)  # wandb has some bug
 
+    # collect final results across all eval targets for result JSON
+    all_results = []
+
     for iter in range(variant['max_iters']):
         outputs = trainer.train_iteration(num_steps=variant['num_steps_per_iter'], iter_num=iter+1, print_logs=True)
         if log_to_wandb:
             wandb.log(outputs)
+
+        # save checkpoint after every iteration
+        save_checkpoint(model, optimizer, scheduler, iter + 1, run_checkpoint_dir, variant)
+
+        # collect eval metrics on the final iteration
+        if iter == variant['max_iters'] - 1:
+            for target_rew in env_targets:
+                key_mean = f'evaluation/target_{target_rew}_return_mean'
+                key_std  = f'evaluation/target_{target_rew}_return_std'
+                all_results.append({
+                    'noise_std': reward_noise_std,
+                    'model_type': model_type,
+                    'env': env_name,
+                    'dataset': dataset,
+                    'target_return': target_rew,
+                    'return_mean': outputs.get(key_mean, None),
+                    'return_std':  outputs.get(key_std,  None),
+                })
+
+    # save results JSON
+    os.makedirs('results', exist_ok=True)
+    result_path = os.path.join(
+        'results',
+        f'{env_name}-{dataset}-{model_type}-noise{reward_noise_std}.json'
+    )
+    with open(result_path, 'w') as f:
+        json.dump(all_results, f, indent=2)
+    print(f'[results] Saved → {result_path}')
+
+    return all_results
 
 
 if __name__ == '__main__':
@@ -302,7 +379,12 @@ if __name__ == '__main__':
     parser.add_argument('--num_steps_per_iter', type=int, default=10000)
     parser.add_argument('--device', type=str, default='cuda')
     parser.add_argument('--log_to_wandb', '-w', type=bool, default=False)
-    
+    # --- new args ---
+    parser.add_argument('--reward_noise_std', type=float, default=0.0,
+                        help='Std of Gaussian noise added to rewards (0.0 = clean)')
+    parser.add_argument('--checkpoint_dir', type=str, default='checkpoints',
+                        help='Root directory for saving checkpoints')
+
     args = parser.parse_args()
 
     experiment('gym-experiment', variant=vars(args))
