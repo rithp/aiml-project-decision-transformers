@@ -63,11 +63,12 @@ def experiment(
     log_to_wandb = variant.get('log_to_wandb', False)
     reward_noise_std = variant.get('reward_noise_std', 0.0)
     checkpoint_dir = variant.get('checkpoint_dir', 'checkpoints')
+    gamma = variant.get('gamma', 1.0)
 
     env_name, dataset = variant['env'], variant['dataset']
     model_type = variant['model_type']
     group_name = f'{exp_prefix}-{env_name}-{dataset}'
-    exp_prefix = f'{group_name}-noise{reward_noise_std}-{random.randint(int(1e5), int(1e6) - 1)}'
+    exp_prefix = f'{group_name}-gamma{gamma}-{random.randint(int(1e5), int(1e6) - 1)}'
 
     if env_name == 'hopper':
         env = gym.make('Hopper-v5')
@@ -110,6 +111,7 @@ def experiment(
     # save all path information into separate lists
     mode = variant.get('mode', 'normal')
     states, traj_lens, returns = [], [], []
+    disc_returns = []  # discounted returns under the configured gamma
     for path in trajectories:
         if mode == 'delayed':  # delayed: all rewards moved to end of trajectory
             path['rewards'][-1] = path['rewards'].sum()
@@ -117,7 +119,22 @@ def experiment(
         states.append(path['observations'])
         traj_lens.append(len(path['observations']))
         returns.append(path['rewards'].sum())
+        disc_returns.append(discount_cumsum(path['rewards'], gamma=gamma)[0])  # full-traj discounted return
     traj_lens, returns = np.array(traj_lens), np.array(returns)
+    disc_returns = np.array(disc_returns)
+
+    # --- Option A: derive evaluation targets from dataset discounted return percentiles ---
+    # 90th percentile → high target, 50th percentile → medium target
+    # This ensures the target is always in-distribution for whatever gamma is used.
+    if variant.get('auto_targets', True) and model_type == 'dt':
+        high_target = float(np.percentile(disc_returns, 90))
+        med_target  = float(np.percentile(disc_returns, 50))
+        # Round to nearest 100 for readability
+        high_target = round(high_target / 100) * 100
+        med_target  = round(med_target  / 100) * 100
+        env_targets = [high_target, med_target]
+        print(f'[gamma={gamma}] Auto-derived targets from discounted returns: {env_targets}')
+        print(f'  (disc_return p90={np.percentile(disc_returns, 90):.1f}, p50={np.percentile(disc_returns, 50):.1f})')
 
     # used for input normalization
     states = np.concatenate(states, axis=0)
@@ -127,8 +144,10 @@ def experiment(
 
     print('=' * 50)
     print(f'Starting new experiment: {env_name} {dataset}')
+    print(f'Gamma: {gamma}')
     print(f'{len(traj_lens)} trajectories, {num_timesteps} timesteps found')
-    print(f'Average return: {np.mean(returns):.2f}, std: {np.std(returns):.2f}')
+    print(f'Average return (undiscounted): {np.mean(returns):.2f}, std: {np.std(returns):.2f}')
+    print(f'Average return (discounted):   {np.mean(disc_returns):.2f}, std: {np.std(disc_returns):.2f}')
     print(f'Max return: {np.max(returns):.2f}, min: {np.min(returns):.2f}')
     print('=' * 50)
 
@@ -175,7 +194,7 @@ def experiment(
                 d.append(traj['dones'][si:si + max_len].reshape(1, -1))
             timesteps.append(np.arange(si, si + s[-1].shape[1]).reshape(1, -1))
             timesteps[-1][timesteps[-1] >= max_ep_len] = max_ep_len-1  # padding cutoff
-            rtg.append(discount_cumsum(traj['rewards'][si:], gamma=1.)[:s[-1].shape[1] + 1].reshape(1, -1, 1))
+            rtg.append(discount_cumsum(traj['rewards'][si:], gamma=gamma)[:s[-1].shape[1] + 1].reshape(1, -1, 1))
             if rtg[-1].shape[1] <= s[-1].shape[1]:
                 rtg[-1] = np.concatenate([rtg[-1], np.zeros((1, 1, 1))], axis=1)
 
@@ -335,6 +354,7 @@ def experiment(
                 key_mean = f'evaluation/target_{target_rew}_return_mean'
                 key_std  = f'evaluation/target_{target_rew}_return_std'
                 all_results.append({
+                    'gamma': gamma,
                     'noise_std': reward_noise_std,
                     'model_type': model_type,
                     'env': env_name,
@@ -346,10 +366,11 @@ def experiment(
 
     # save results JSON
     os.makedirs('results', exist_ok=True)
-    result_path = os.path.join(
-        'results',
-        f'{env_name}-{dataset}-{model_type}-noise{reward_noise_std}.json'
-    )
+    # gamma experiment results use a dedicated filename
+    if gamma != 1.0 or variant.get('gamma_experiment', False):
+        result_path = os.path.join('results', f'{env_name}-{dataset}-{model_type}-gamma{gamma}.json')
+    else:
+        result_path = os.path.join('results', f'{env_name}-{dataset}-{model_type}-noise{reward_noise_std}.json')
     with open(result_path, 'w') as f:
         json.dump(all_results, f, indent=2)
     print(f'[results] Saved → {result_path}')
@@ -384,6 +405,12 @@ if __name__ == '__main__':
                         help='Std of Gaussian noise added to rewards (0.0 = clean)')
     parser.add_argument('--checkpoint_dir', type=str, default='checkpoints',
                         help='Root directory for saving checkpoints')
+    parser.add_argument('--gamma', type=float, default=1.0,
+                        help='Discount factor for RTG computation (1.0 = original DT)')
+    parser.add_argument('--auto_targets', type=lambda x: x.lower() != 'false', default=True,
+                        help='Derive evaluation targets from dataset discounted-return percentiles')
+    parser.add_argument('--gamma_experiment', action='store_true',
+                        help='Flag to use gamma-specific result filename even at gamma=1.0')
 
     args = parser.parse_args()
 
