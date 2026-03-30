@@ -17,8 +17,10 @@ gym/data/*.pkl
 gym/data/*.h5
 gym/data/*.hdf5
 
-# Checkpoints (can be very large)
-gym/checkpoints/
+# Checkpoints — keep only the final iteration, exclude intermediates
+gym/checkpoints/**/checkpoint_iter[0-9].pt
+gym/checkpoints/**/checkpoint_iter[1-9][0-9].pt
+# (checkpoint_iter10.pt is NOT excluded — it is the final saved model)
 
 # macOS
 .DS_Store
