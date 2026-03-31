@@ -1,0 +1,22 @@
+[
+  {
+    "gamma": 0.97,
+    "noise_std": 0.0,
+    "model_type": "dt",
+    "env": "hopper",
+    "dataset": "medium",
+    "target_return": 100,
+    "return_mean": 1411.1499641923995,
+    "return_std": 166.0150432327442
+  },
+  {
+    "gamma": 0.97,
+    "noise_std": 0.0,
+    "model_type": "dt",
+    "env": "hopper",
+    "dataset": "medium",
+    "target_return": 100,
+    "return_mean": 1411.1499641923995,
+    "return_std": 166.0150432327442
+  }
+]

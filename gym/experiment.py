@@ -129,12 +129,25 @@ def experiment(
     if variant.get('auto_targets', True) and model_type == 'dt':
         high_target = float(np.percentile(disc_returns, 90))
         med_target  = float(np.percentile(disc_returns, 50))
-        # Round to nearest 100 for readability
-        high_target = round(high_target / 100) * 100
-        med_target  = round(med_target  / 100) * 100
+        # Adaptive rounding: use granularity proportional to the magnitude of the returns
+        # so that p90 and p50 remain distinct even for small discounted returns (low gamma).
+        magnitude = max(abs(high_target), 1.0)
+        if magnitude >= 500:
+            gran = 100
+        elif magnitude >= 50:
+            gran = 10
+        elif magnitude >= 5:
+            gran = 1
+        else:
+            gran = 0.1
+        high_target = round(high_target / gran) * gran
+        med_target  = round(med_target  / gran) * gran
+        # Ensure they stay distinct; if still equal, nudge med_target down by one granule
+        if high_target == med_target:
+            med_target = high_target - gran
         env_targets = [high_target, med_target]
         print(f'[gamma={gamma}] Auto-derived targets from discounted returns: {env_targets}')
-        print(f'  (disc_return p90={np.percentile(disc_returns, 90):.1f}, p50={np.percentile(disc_returns, 50):.1f})')
+        print(f'  (disc_return p90={np.percentile(disc_returns, 90):.2f}, p50={np.percentile(disc_returns, 50):.2f}, gran={gran})')
 
     # used for input normalization
     states = np.concatenate(states, axis=0)
