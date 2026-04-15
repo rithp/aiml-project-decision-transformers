@@ -34,15 +34,45 @@ from transformers.file_utils import (
 from transformers.modeling_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
 )
-from transformers.modeling_utils import (
-    Conv1D,
-    PreTrainedModel,
-    SequenceSummary,
-    find_pruneable_heads_and_indices,
-    prune_conv1d_layer,
-)
+from transformers.pytorch_utils import Conv1D
+from transformers.modeling_utils import PreTrainedModel
+
+
+def find_pruneable_heads_and_indices(heads, n_heads, head_size, already_pruned_heads):
+    mask = torch.ones(n_heads, head_size)
+    heads = set(heads) - already_pruned_heads
+    for head in heads:
+        head = head - sum(1 if h < head else 0 for h in already_pruned_heads)
+        mask[head] = 0
+    mask = mask.view(-1).contiguous().eq(1)
+    index = torch.arange(len(mask))[mask].long()
+    return heads, index
+
+
+def prune_conv1d_layer(layer, index, dim=1):
+    index = index.to(layer.weight.device)
+    W = layer.weight.index_select(dim, index).clone().detach()
+    if dim == 0:
+        b = layer.bias.clone().detach()
+    else:
+        b = layer.bias[index].clone().detach()
+    new_size = list(layer.weight.size())
+    new_size[dim] = len(index)
+    new_layer = Conv1D(new_size[1], new_size[0]).to(layer.weight.device)
+    new_layer.weight.requires_grad = False
+    new_layer.weight.copy_(W.contiguous())
+    new_layer.weight.requires_grad = True
+    new_layer.bias.requires_grad = False
+    new_layer.bias.copy_(b.contiguous())
+    new_layer.bias.requires_grad = True
+    return new_layer
 from transformers.utils import logging
-from transformers.utils.model_parallel_utils import assert_device_map, get_device_map
+
+def assert_device_map(device_map, num_blocks):
+    pass
+
+def get_device_map(num_blocks, devices):
+    return {d: list(range(num_blocks)) for d in devices}
 from transformers.models.gpt2.configuration_gpt2 import GPT2Config
 
 logger = logging.get_logger(__name__)
@@ -366,6 +396,15 @@ class GPT2PreTrainedModel(PreTrainedModel):
             module.weight.data.fill_(1.0)
             # module.weight.data.fill_(.01)  # KL: Adapter change
 
+    def get_head_mask(self, head_mask, num_hidden_layers, is_attention_chunked=False):
+        if head_mask is not None:
+            head_mask = self._convert_head_mask_to_5d(head_mask, num_hidden_layers)
+            if is_attention_chunked:
+                head_mask = head_mask.unsqueeze(-1)
+        else:
+            head_mask = [None] * num_hidden_layers
+        return head_mask
+
 
 @dataclass
 class GPT2DoubleHeadsModelOutput(ModelOutput):
@@ -520,10 +559,10 @@ class GPT2Model(GPT2PreTrainedModel):
         self.wte = nn.Embedding(config.vocab_size, config.n_embd)
         # self.wpe = nn.Embedding(config.n_positions, config.n_embd)
         self.drop = nn.Dropout(config.embd_pdrop)
-        self.h = nn.ModuleList([Block(config.n_ctx, config, scale=True) for _ in range(config.n_layer)])
+        self.h = nn.ModuleList([Block(config.n_positions, config, scale=True) for _ in range(config.n_layer)])
         self.ln_f = nn.LayerNorm(config.n_embd, eps=config.layer_norm_epsilon)
 
-        self.init_weights()
+        self.post_init()
         # Model parallel
         self.model_parallel = False
         self.device_map = None
@@ -583,12 +622,6 @@ class GPT2Model(GPT2PreTrainedModel):
             self.h[layer].attn.prune_heads(heads)
 
     @add_start_docstrings_to_model_forward(GPT2_INPUTS_DOCSTRING)
-    @add_code_sample_docstrings(
-        tokenizer_class=_TOKENIZER_FOR_DOC,
-        checkpoint="gpt2",
-        output_type=BaseModelOutputWithPastAndCrossAttentions,
-        config_class=_CONFIG_FOR_DOC,
-    )
     def forward(
             self,
             input_ids=None,

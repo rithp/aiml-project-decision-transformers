@@ -1,4 +1,4 @@
-import gym
+import gymnasium as gym
 import numpy as np
 import torch
 import wandb
@@ -36,17 +36,17 @@ def experiment(
     exp_prefix = f'{group_name}-{random.randint(int(1e5), int(1e6) - 1)}'
 
     if env_name == 'hopper':
-        env = gym.make('Hopper-v3')
+        env = gym.make('Hopper-v4')
         max_ep_len = 1000
         env_targets = [3600, 1800]  # evaluation conditioning targets
         scale = 1000.  # normalization for rewards/returns
     elif env_name == 'halfcheetah':
-        env = gym.make('HalfCheetah-v3')
+        env = gym.make('HalfCheetah-v4')
         max_ep_len = 1000
         env_targets = [12000, 6000]
         scale = 1000.
     elif env_name == 'walker2d':
-        env = gym.make('Walker2d-v3')
+        env = gym.make('Walker2d-v4')
         max_ep_len = 1000
         env_targets = [5000, 2500]
         scale = 1000.
@@ -159,7 +159,7 @@ def experiment(
         d = torch.from_numpy(np.concatenate(d, axis=0)).to(dtype=torch.long, device=device)
         rtg = torch.from_numpy(np.concatenate(rtg, axis=0)).to(dtype=torch.float32, device=device)
         timesteps = torch.from_numpy(np.concatenate(timesteps, axis=0)).to(dtype=torch.long, device=device)
-        mask = torch.from_numpy(np.concatenate(mask, axis=0)).to(device=device)
+        mask = torch.from_numpy(np.concatenate(mask, axis=0)).to(dtype=torch.float32, device=device)
 
         return s, a, r, d, rtg, timesteps, mask
 
@@ -300,7 +300,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_eval_episodes', type=int, default=100)
     parser.add_argument('--max_iters', type=int, default=10)
     parser.add_argument('--num_steps_per_iter', type=int, default=10000)
-    parser.add_argument('--device', type=str, default='cuda')
+    parser.add_argument('--device', type=str, default='mps')
     parser.add_argument('--log_to_wandb', '-w', type=bool, default=False)
     
     args = parser.parse_args()
