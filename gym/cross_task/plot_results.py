@@ -80,7 +80,7 @@ def plot_learning_curves(results, output_dir, target_return=5000):
                 markersize=4)
 
         ax.set_xlabel("Gradient Steps", fontsize=12)
-        ax.set_ylabel(f"Mean Return (target={target_return})", fontsize=12)
+        ax.set_ylabel("Mean Return", fontsize=12)
         ax.set_title(
             f"Cross-Task Transfer: {exp_data['source_dataset']} → "
             f"{exp_data['target_domain']}",
