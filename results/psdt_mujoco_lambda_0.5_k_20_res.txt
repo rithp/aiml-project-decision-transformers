@@ -1,0 +1,24 @@
+/home/mariammaa/anaconda3/envs/knowledge_comp_env/lib/python3.10/site-packages/gymnasium/envs/registration.py:512: DeprecationWarning: [33mWARN: The environment Hopper-v4 is out of date. You should consider upgrading to version `v5`.[0m
+  logger.deprecation(
+============================================================
+D4RL MuJoCo Experiment
+  Env: hopper-medium
+  Mode: delayed (all rewards moved to final step)
+  Model: psdt
+  K: 20, State dim: 11, Act dim: 3
+  2186 trajectories, 999905 timesteps
+  Returns: mean=1422.1, std=378.9, max=3218.0, min=315.9
+============================================================
+Total parameters: 1,046,332
+Iter 1/10 (512s) | Loss: 0.5729 | Act loss: 0.1890 | Pred loss: 0.7679 | T=3600: 372.1 (10.3%) | T=1800: 337.0 (18.7%)
+Iter 2/10 (1066s) | Loss: 0.2031 | Act loss: 0.0982 | Pred loss: 0.2098 | T=3600: 670.7 (18.6%) | T=1800: 595.8 (33.1%)
+Iter 3/10 (1694s) | Loss: 0.1746 | Act loss: 0.0854 | Pred loss: 0.1785 | T=3600: 764.1 (21.2%) | T=1800: 1203.7 (66.9%)
+Iter 4/10 (2414s) | Loss: 0.1629 | Act loss: 0.0797 | Pred loss: 0.1663 | T=3600: 1411.3 (39.2%) | T=1800: 1434.7 (79.7%)
+Iter 5/10 (3087s) | Loss: 0.1558 | Act loss: 0.0764 | Pred loss: 0.1587 | T=3600: 1340.8 (37.2%) | T=1800: 1077.7 (59.9%)
+Iter 6/10 (3760s) | Loss: 0.1508 | Act loss: 0.0740 | Pred loss: 0.1536 | T=3600: 1014.4 (28.2%) | T=1800: 1441.5 (80.1%)
+Iter 7/10 (4431s) | Loss: 0.1469 | Act loss: 0.0722 | Pred loss: 0.1494 | T=3600: 904.7 (25.1%) | T=1800: 1428.7 (79.4%)
+Iter 8/10 (5216s) | Loss: 0.1441 | Act loss: 0.0707 | Pred loss: 0.1466 | T=3600: 1876.1 (52.1%) | T=1800: 1584.4 (88.0%)
+Iter 9/10 (5919s) | Loss: 0.1416 | Act loss: 0.0696 | Pred loss: 0.1440 | T=3600: 1479.9 (41.1%) | T=1800: 1277.5 (71.0%)
+Iter 10/10 (6549s) | Loss: 0.1394 | Act loss: 0.0685 | Pred loss: 0.1418 | T=3600: 991.1 (27.5%) | T=1800: 1049.8 (58.3%)
+
+Model saved to checkpoints/psdt_hopper_medium_delayed.pt

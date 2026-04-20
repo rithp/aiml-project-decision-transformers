@@ -1,0 +1,24 @@
+/home/mariammaa/anaconda3/envs/knowledge_comp_env/lib/python3.10/site-packages/gymnasium/envs/registration.py:512: DeprecationWarning: [33mWARN: The environment Hopper-v4 is out of date. You should consider upgrading to version `v5`.[0m
+  logger.deprecation(
+============================================================
+D4RL MuJoCo Experiment
+  Env: hopper-medium
+  Mode: delayed (all rewards moved to final step)
+  Model: psdt
+  K: 20, State dim: 11, Act dim: 3
+  2186 trajectories, 999905 timesteps
+  Returns: mean=1422.1, std=378.9, max=3218.0, min=315.9
+============================================================
+Total parameters: 1,046,332
+Iter 1/10 (905s) | Loss: 0.1601 | Act loss: 0.1601 | Pred loss: 3.3571 | Cell norm: 1.716 | T=3600: 1396.6 (38.8%) | T=1800: 1414.1 (78.6%)
+Iter 2/10 (1824s) | Loss: 0.0779 | Act loss: 0.0779 | Pred loss: 3.3226 | Cell norm: 1.726 | T=3600: 1599.8 (44.4%) | T=1800: 1419.8 (78.9%)
+Iter 3/10 (2877s) | Loss: 0.0688 | Act loss: 0.0688 | Pred loss: 3.3127 | Cell norm: 1.729 | T=3600: 1673.6 (46.5%) | T=1800: 1557.9 (86.5%)
+Iter 4/10 (3800s) | Loss: 0.0650 | Act loss: 0.0650 | Pred loss: 3.3062 | Cell norm: 1.734 | T=3600: 1574.9 (43.7%) | T=1800: 1339.6 (74.4%)
+Iter 5/10 (4744s) | Loss: 0.0628 | Act loss: 0.0628 | Pred loss: 3.3135 | Cell norm: 1.740 | T=3600: 1698.1 (47.2%) | T=1800: 1433.9 (79.7%)
+Iter 6/10 (5736s) | Loss: 0.0611 | Act loss: 0.0611 | Pred loss: 3.3203 | Cell norm: 1.741 | T=3600: 1945.6 (54.0%) | T=1800: 1724.3 (95.8%)
+Iter 7/10 (6689s) | Loss: 0.0600 | Act loss: 0.0600 | Pred loss: 3.3209 | Cell norm: 1.740 | T=3600: 1778.3 (49.4%) | T=1800: 1508.8 (83.8%)
+Iter 8/10 (7737s) | Loss: 0.0590 | Act loss: 0.0590 | Pred loss: 3.3235 | Cell norm: 1.740 | T=3600: 1691.9 (47.0%) | T=1800: 1535.7 (85.3%)
+Iter 9/10 (8774s) | Loss: 0.0583 | Act loss: 0.0583 | Pred loss: 3.3184 | Cell norm: 1.743 | T=3600: 1688.8 (46.9%) | T=1800: 1397.3 (77.6%)
+Iter 10/10 (9724s) | Loss: 0.0576 | Act loss: 0.0576 | Pred loss: 3.3171 | Cell norm: 1.746 | T=3600: 1660.6 (46.1%) | T=1800: 1500.9 (83.4%)
+
+Model saved to checkpoints/psdt_hopper_medium_delayed_fixed.pt
