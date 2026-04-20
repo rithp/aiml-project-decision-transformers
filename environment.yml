@@ -1,0 +1,16 @@
+name: psdt_env
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - numpy
+  - pip
+  - pip:
+    - torch>=2.0
+    - transformers>=4.40
+    - gymnasium[mujoco]>=0.29
+    - mujoco>=3.0
+    - wandb
